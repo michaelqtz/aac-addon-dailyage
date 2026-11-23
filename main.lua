@@ -3,7 +3,7 @@ local api = require("api")
 local dailyAge_addon = {
 	name = "DailyAge",
 	author = "Michaelqt",
-	version = "1.1.0",
+	version = "1.2.0",
 	desc = "Dailies & Weeklies Quest Tracker."
 }
 
@@ -769,12 +769,41 @@ local function OnLoad()
     overlayBtn:SetText("DailyAge ")
     overlayBtn.style:SetFontSize(13)
     overlayBtn:Show(true)
-    overlayBtn:AddAnchor("TOPRIGHT", "UIParent", -350, -10)
+    -- Use the saved position if the player has moved the button, otherwise
+    -- sit left of the default top-right HUD buttons (Daily Activities etc.)
+    if settings.overlayBtnX ~= nil and settings.overlayBtnY ~= nil then
+        overlayBtn:AddAnchor("TOPLEFT", "UIParent", settings.overlayBtnX, settings.overlayBtnY)
+    else
+        overlayBtn:AddAnchor("TOPRIGHT", "UIParent", -500, -10)
+    end
     function overlayBtn:OnClick()
+        -- Shift is held for moving the button, don't toggle the window
+        if api.Input:IsShiftKeyDown() then return end
         local showWnd = not dailyAgeWindow.questListWindow:IsVisible()
         dailyAgeWindow.questListWindow:Show(showWnd)
-    end 
+    end
     overlayBtn:SetHandler("OnClick", overlayBtn.OnClick)
+    -- Shift + drag to move the button, the position is saved
+    function overlayBtn:OnDragStart()
+        if not api.Input:IsShiftKeyDown() then return end
+        self.isMoving = true
+        self:StartMoving()
+        api.Cursor:ClearCursor()
+        api.Cursor:SetCursorImage(CURSOR_PATH.MOVE, 0, 0)
+    end
+    function overlayBtn:OnDragStop()
+        if not self.isMoving then return end
+        self.isMoving = false
+        self:StopMovingOrSizing()
+        api.Cursor:ClearCursor()
+        local x, y = self:GetOffset()
+        settings.overlayBtnX = x
+        settings.overlayBtnY = y
+        api.SaveSettings()
+    end
+    overlayBtn:SetHandler("OnDragStart", overlayBtn.OnDragStart)
+    overlayBtn:SetHandler("OnDragStop", overlayBtn.OnDragStop)
+    overlayBtn:EnableDrag(true)
     dailyAgeWindow.overlayBtn = overlayBtn
 
     local tabInfo = {
@@ -834,7 +863,7 @@ local function OnLoad()
     updateCompletedQuestLabels() --> Fill quest labels
     dailyAgeWindow:Show(true)
 
-    api.Log:Info("[DailyAge] Successfully loaded. Please find the DailyAge button in the top right of your screen.")
+    api.Log:Info("[DailyAge] Successfully loaded. Please find the DailyAge button in the top right of your screen. Shift + drag it to move it.")
     api.On("UPDATE", OnUpdate)
 	api.SaveSettings()
 end
